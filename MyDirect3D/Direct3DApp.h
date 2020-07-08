@@ -64,17 +64,34 @@ protected:
 	// 创建并初始化主窗口。
 	bool InitMainWindow();
 
-	bool InitDirect3D(); // 初始化 Direct3D。
-	void LogAdapters(); // 记录显示适配器。
-	void LogAdapterOutputs(IDXGIAdapter* Adapter); // 记录显示适配器输出设备。
-	void LogOutputDisplayModes(IDXGIOutput* Output, DXGI_FORMAT Format); // 记录显示适配器输出设备的显示模式。
-	void CreateCommandObjects(); // 创建命令对象。
-	void CreateSwapChain(); // 创建交换链。
-	virtual void CreateRtvAndDsvDescriptorHeaps(); // 创建 RTV 和 DSV 描述符堆。
-	virtual void FlushCommandQueue(); // 刷新命令队列。
-	ID3D12Resource* GetCurrentBackBuffer() const; // 获取当前后台缓冲区。
+	// 初始化 Direct3D。
+	bool InitDirect3D();
 
-	 // 主窗口程序。
+	// 记录适配器信息。
+	void LogAdapters();
+
+	// 记录适配器输出信息。
+	void LogAdapterOutputs(IDXGIAdapter* Adapter);
+
+	// 记录输出显示模式信息。
+	void LogOutputDisplayModes(IDXGIOutput* Output, DXGI_FORMAT Format);
+
+	// 创建命令对象。
+	void CreateCommandObjects();
+
+	// 创建交换链。
+	void CreateSwapChain();
+
+	// 创建 RTV 和 DSV 描述符堆。
+	virtual void CreateRtvAndDsvDescriptorHeaps();
+
+	// 刷新命令队列。
+	virtual void FlushCommandQueue();
+
+	// 获取当前后台缓冲区。
+	ID3D12Resource* GetCurrentBackBuffer() const;
+
+	// 主窗口程序。
 	static LRESULT CALLBACK MainWindowProcedure(HWND Wnd, UINT Msg, WPARAM WParam, LPARAM LParam);
 
 protected:

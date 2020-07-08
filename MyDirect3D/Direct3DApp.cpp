@@ -106,18 +106,18 @@ bool Direct3DApp::InitMainWindow()
 {
 	WNDCLASSEX MainWindowClass;
 
-	MainWindowClass.cbSize = sizeof(WNDCLASSEX);									// 此结构体的字节大小
-	MainWindowClass.style = CS_HREDRAW | CS_VREDRAW;								// 样式
+	MainWindowClass.cbSize = sizeof(MainWindowClass);									// 此结构体的字节大小
+	MainWindowClass.style = CS_HREDRAW | CS_VREDRAW;									// 样式
 	MainWindowClass.lpfnWndProc = MainWindowProcedure;									// 窗口程序的指针
-	MainWindowClass.cbClsExtra = 0;													// 系统为此结构体分配的额外字节数
-	MainWindowClass.cbWndExtra = 0;													// 系统为窗口实例分配的额外字节数
+	MainWindowClass.cbClsExtra = 0;														// 系统为此结构体分配的额外字节数
+	MainWindowClass.cbWndExtra = 0;														// 系统为窗口实例分配的额外字节数
 	MainWindowClass.hInstance = AppInstance;											// 注册窗口类的应用程序或动态链接库的实例句柄
-	MainWindowClass.hIcon = LoadIcon(AppInstance, MAKEINTRESOURCE(IDI_ICON));	// 图标的句柄
-	MainWindowClass.hCursor = LoadCursor(0, IDC_ARROW);								// 游标的句柄
-	MainWindowClass.hbrBackground = (HBRUSH)GetStockObject(NULL_BRUSH);					// 背景画刷的句柄
-	MainWindowClass.lpszMenuName = NULL;													// 菜单资源名
-	MainWindowClass.lpszClassName = MainWindowClassName.c_str();							// 类名
-	MainWindowClass.hIconSm = NULL;													// 小图标的句柄
+	MainWindowClass.hIcon = LoadIcon(AppInstance, MAKEINTRESOURCE(IDI_ICON));			// 图标的句柄
+	MainWindowClass.hCursor = LoadCursor(NULL, IDC_ARROW);								// 游标的句柄
+	MainWindowClass.hbrBackground = static_cast<HBRUSH>(GetStockObject(NULL_BRUSH));	// 背景画刷的句柄
+	MainWindowClass.lpszMenuName = NULL;												// 菜单资源名
+	MainWindowClass.lpszClassName = MainWindowClassName.c_str();						// 类名
+	MainWindowClass.hIconSm = NULL;														// 小图标的句柄
 
 	// 注册窗口类
 	if (!RegisterClassEx(&MainWindowClass))
@@ -133,14 +133,14 @@ bool Direct3DApp::InitMainWindow()
 	LONG WindowHeight = WindowRect.bottom - WindowRect.top;
 
 	// 根据工作区矩形的期望大小，计算窗口矩形所需的大小
-	AdjustWindowRectEx(&WindowRect, WS_TILED, FALSE, NULL);
+	AdjustWindowRectEx(&WindowRect, WS_OVERLAPPEDWINDOW, FALSE, NULL);
 
 	// 创建窗口
 	MainWindow = CreateWindowEx(
 		NULL,
 		MainWindowClassName.c_str(),
 		MainWindowName.c_str(),
-		WS_TILED,
+		WS_OVERLAPPEDWINDOW,
 		static_cast<int>((GetSystemMetrics(SM_CXSCREEN) - WindowWidth) / 2),
 		static_cast<int>((GetSystemMetrics(SM_CYSCREEN) - WindowHeight) / 2),
 		WindowWidth,
@@ -158,7 +158,7 @@ bool Direct3DApp::InitMainWindow()
 		return false;
 	}
 
-	// 设定主窗口的显示状态
+	// 显示并向窗口程序发送一个 WM_PAINT 消息
 	ShowWindow(MainWindow, SW_SHOW);
 
 	// 更新主窗口的工作区
@@ -173,34 +173,34 @@ bool Direct3DApp::InitDirect3D()
 	ComPtr<ID3D12Debug> DebugController;
 	THROW_IF_FAILED(D3D12GetDebugInterface(IID_PPV_ARGS(&DebugController)));
 	DebugController->EnableDebugLayer();
-#endif // 启用 D3D12 调试层
+#endif // 启用 D3D12 调试层。
 
 	HRESULT HardwareResult = S_OK;
+	D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS QualityLevels = D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS();
 
-	// 创建 DXGI 工厂
+	// 创建 DXGI 工厂。
 	THROW_IF_FAILED(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&DxgiFactory)));
 
-	// 创建表示显示适配器的设备
+	// 创建设备，用来表示显示适配器。第一个参数传递 nullptr 使用默认适配器（IDXGIFactory1::EnumAdapters 函数枚举的第一个适配器）。
 	HardwareResult = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&Device));
+	// 若创建设备失败，则枚举 WARP（Windows Advanced Rasterization Platform，Windows 高级光栅化平台）作为适配器来创建设备。
 	if (FAILED(HardwareResult))
 	{
 		ComPtr<IDXGIAdapter4> WarpAdapter;
 
-		THROW_IF_FAILED(DxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&WarpAdapter))); // 枚举 WARP 适配器
+		THROW_IF_FAILED(DxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&WarpAdapter)));
 		THROW_IF_FAILED(D3D12CreateDevice(WarpAdapter.Get(), D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&Device)));
 	}
 
-	// 创建 D3D12 围栏
+	// 创建围栏。
 	THROW_IF_FAILED(Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&Fence)));
 
-	// 获取描述符堆的句柄增量的大小
+	// 获取描述符堆的句柄增量大小。
 	RtvDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	DsvDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 	CbvSrvUavDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	// 获取当前图形驱动程序支持的功能级别的信息
-	D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS QualityLevels;
-
+	// 检查当前图形驱动程序支持的多重采样的质量级别信息。
 	QualityLevels.Format = BackBufferFormat;
 	QualityLevels.SampleCount = 4;
 	QualityLevels.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE;
@@ -208,11 +208,11 @@ bool Direct3DApp::InitDirect3D()
 
 	THROW_IF_FAILED(Device->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS, &QualityLevels, sizeof(QualityLevels)));
 	Current4xMsaaQualityLevels = QualityLevels.NumQualityLevels;
-	assert(Current4xMsaaQualityLevels > 0 && "Unexpected MSAA quality level.");
+	assert(Current4xMsaaQualityLevels > 0 && "Unexpected MSAA quality levels.");
 
 #ifdef _DEBUG
 	LogAdapters();
-#endif
+#endif // 将当前适配器信息打印到输出窗口。
 
 	CreateCommandObjects();
 
@@ -225,51 +225,53 @@ bool Direct3DApp::InitDirect3D()
 
 void Direct3DApp::LogAdapters()
 {
-	IDXGIAdapter* Adapter = nullptr;
-	vector<IDXGIAdapter*> AdapterList;
 	UINT Index = 0;
+	IDXGIAdapter* Adapter = nullptr;
+	DXGI_ADAPTER_DESC AdapterDesc = DXGI_ADAPTER_DESC();
+	wstring Text = L"";
 
-	while (DxgiFactory->EnumAdapters(Index++, &Adapter) != DXGI_ERROR_NOT_FOUND)
+	// 根据索引枚举本地系统中的适配器。
+	while (DxgiFactory->EnumAdapters(Index, &Adapter) != DXGI_ERROR_NOT_FOUND)
 	{
-		DXGI_ADAPTER_DESC AdapterDesc;
-		wstring Text = L"Adapter: ";
-
 		Adapter->GetDesc(&AdapterDesc);
+
+		Text = L"[Adapter " + to_wstring(Index) + L"]: ";
 		Text += AdapterDesc.Description;
 		Text += L"\n";
 
 		OutputDebugString(Text.c_str());
 
-		AdapterList.push_back(Adapter);
-	}
+		LogAdapterOutputs(Adapter); // 记录该适配器的输出信息
 
-	for (size_t i = 0; i != AdapterList.size(); ++i)
-	{
-		LogAdapterOutputs(AdapterList[i]);
-		RELEASE_COM(AdapterList[i]);
+		RELEASE_COM(Adapter);
+
+		++Index;
 	}
 }
 
 void Direct3DApp::LogAdapterOutputs(IDXGIAdapter* Adapter)
 {
-	IDXGIOutput* Output = nullptr;
 	UINT Index = 0;
+	IDXGIOutput* Output = nullptr;
+	DXGI_OUTPUT_DESC OutputDesc;
+	wstring Text = L"";
 
-	while (Adapter->EnumOutputs(Index++, &Output) != DXGI_ERROR_NOT_FOUND)
+	// 根据索引枚举适配器的输出。
+	while (Adapter->EnumOutputs(Index, &Output) != DXGI_ERROR_NOT_FOUND)
 	{
-		DXGI_OUTPUT_DESC OutputDesc;
-		wstring Text = L"Output: ";
-
 		Output->GetDesc(&OutputDesc);
 
+		Text = L" [Output " + to_wstring(Index) + L"]: ";
 		Text += OutputDesc.DeviceName;;
 		Text += L"\n";
 
 		OutputDebugString(Text.c_str());
 
-		LogOutputDisplayModes(Output, BackBufferFormat);
+		LogOutputDisplayModes(Output, BackBufferFormat); // 记录该输出的显示模式信息
 
 		RELEASE_COM(Output);
+
+		++Index;
 	}
 }
 
@@ -278,16 +280,17 @@ void Direct3DApp::LogOutputDisplayModes(IDXGIOutput* Output, DXGI_FORMAT Format)
 	UINT Flags = 0;
 	UINT ModeCount = 0;
 	wstring Text = L"";
+	vector<DXGI_MODE_DESC> ModeList;
 
-	Output->GetDisplayModeList(Format, Flags, &ModeCount, nullptr);
+	Output->GetDisplayModeList(Format, Flags, &ModeCount, nullptr); // 获取显示模式的数量
 
-	vector<DXGI_MODE_DESC> ModeList(ModeCount);
+	ModeList.resize(ModeCount);
 
-	Output->GetDisplayModeList(Format, Flags, &ModeCount, &ModeList[0]);
+	Output->GetDisplayModeList(Format, Flags, &ModeCount, &ModeList[0]); // 获取显示模式的列表
 
 	for (DXGI_MODE_DESC& Mode : ModeList)
 	{
-		Text = L"Width = " + to_wstring(Mode.Width) + L" Height = " + to_wstring(Mode.Height) +
+		Text = L"  Width = " + to_wstring(Mode.Width) + L" Height = " + to_wstring(Mode.Height) +
 			L" Refresh = " + to_wstring(Mode.RefreshRate.Numerator) + L" / " + to_wstring(Mode.RefreshRate.Denominator) + L"\n";
 
 		OutputDebugString(Text.c_str());
