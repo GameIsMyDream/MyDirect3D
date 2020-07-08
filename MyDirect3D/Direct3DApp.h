@@ -85,6 +85,9 @@ protected:
 	// 创建 RTV 和 DSV 描述符堆。
 	virtual void CreateRtvAndDsvDescriptorHeaps();
 
+	// 调整窗口大小时调用
+	virtual void OnResize();
+
 	// 刷新命令队列。
 	virtual void FlushCommandQueue();
 
@@ -96,28 +99,31 @@ protected:
 
 protected:
 	static Direct3DApp* Singleton;		// 单例指针
-	HINSTANCE AppInstance;			// 应用程序实例句柄
-	HWND MainWindow;				// 主窗口句柄
+	HINSTANCE AppInstance;				// 应用程序实例句柄
+	HWND MainWindow;					// 主窗口句柄
 	std::wstring MainWindowClassName;	// 主窗口类名
-	std::wstring MainWindowName;	// 主窗口名
-	LONG ClientWidth;				// 主窗口工作区宽度
-	LONG ClientHeight;				// 主窗口工作区高度
+	std::wstring MainWindowName;		// 主窗口名
+	LONG ClientWidth;					// 主窗口工作区宽度
+	LONG ClientHeight;					// 主窗口工作区高度
 
-	static const int SwapChainBufferCount = 2;	// 交换链缓冲区数量
 	int CurrentBackBuffer;						// 当前后台缓冲区索引
-
-	Microsoft::WRL::ComPtr<IDXGIFactory7> DxgiFactory;								// DXGI 工厂
-	Microsoft::WRL::ComPtr<ID3D12Device> Device;									// D3D12 设备
-	Microsoft::WRL::ComPtr<ID3D12Fence> Fence;										// D3D12 围栏
-	Microsoft::WRL::ComPtr<ID3D12Resource> SwapChainBuffers[SwapChainBufferCount];	// 交换链缓冲区数组
-
-	bool b4xMsaaState;						// 4倍多重采样抗锯齿状态
+	bool b4xMsaaState;							// 4倍多重采样抗锯齿状态
 	UINT Current4xMsaaQualityLevels;			// 4倍多重采样抗锯齿质量级别
+	UINT RtvDescriptorSize;						// RTV（渲染目标视图）描述符大小
+	UINT DsvDescriptorSize;						// DSV（深度/模板视图）描述符大小
+	UINT CbvSrvUavDescriptorSize;				// CBV（常量缓冲区视图）、SRV（着色器资源视图）和 UAV（无序访问视图）描述符大小
+	DXGI_FORMAT BackBufferFormat;				// 后台缓冲区格式
+	DXGI_FORMAT DepthStencilBufferFormat;		// 深度模板缓冲区格式
+	static const UINT SwapChainBufferCount = 2;	// 交换链缓冲区数量
 
-	DXGI_FORMAT BackBufferFormat;			// 后台缓冲区格式
-	DXGI_FORMAT DepthStencilBufferFormat;	// 深度模板缓冲区格式
-
-	UINT RtvDescriptorSize;					// RTV 描述符堆大小
-	UINT DsvDescriptorSize;					// DSV 描述符堆大小
-	UINT CbvSrvUavDescriptorSize;			// CBV、SRV 和 UAV 描述符堆大小
+	Microsoft::WRL::ComPtr<IDXGIFactory7>				DxgiFactory;							// DXGI 工厂
+	Microsoft::WRL::ComPtr<ID3D12Device>				Device;									// 设备
+	Microsoft::WRL::ComPtr<ID3D12Fence>					Fence;									// 围栏
+	Microsoft::WRL::ComPtr<ID3D12CommandQueue>			CommandQueue;							// 命令队列
+	Microsoft::WRL::ComPtr<ID3D12CommandAllocator>		DirectCommandAllocator;					// 直接命令分配器
+	Microsoft::WRL::ComPtr<ID3D12GraphicsCommandList>	CommandList;							// 命令列表
+	Microsoft::WRL::ComPtr<IDXGISwapChain>				SwapChain;								// 交换链
+	Microsoft::WRL::ComPtr<ID3D12Resource>				SwapChainBuffers[SwapChainBufferCount];	// 交换链缓冲区数组
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>		RtvHeap;								// RTV 描述符堆
+	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>		DsvHeap;								// DSV 描述符堆
 };

@@ -47,7 +47,7 @@ bool Direct3DApp::Initialize()
 		return false;
 	}
 
-	//OnResize();
+	OnResize();
 
 	return true;
 }
@@ -104,7 +104,7 @@ int Direct3DApp::Run()
 
 bool Direct3DApp::InitMainWindow()
 {
-	WNDCLASSEX MainWindowClass;
+	WNDCLASSEX MainWindowClass = {};
 
 	MainWindowClass.cbSize = sizeof(MainWindowClass);									// 此结构体的字节大小
 	MainWindowClass.style = CS_HREDRAW | CS_VREDRAW;									// 样式
@@ -176,7 +176,7 @@ bool Direct3DApp::InitDirect3D()
 #endif // 启用 D3D12 调试层。
 
 	HRESULT HardwareResult = S_OK;
-	D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS QualityLevels = D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS();
+	D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS QualityLevels = {};
 
 	// 创建 DXGI 工厂。
 	THROW_IF_FAILED(CreateDXGIFactory2(DXGI_CREATE_FACTORY_DEBUG, IID_PPV_ARGS(&DxgiFactory)));
@@ -227,7 +227,7 @@ void Direct3DApp::LogAdapters()
 {
 	UINT Index = 0;
 	IDXGIAdapter* Adapter = nullptr;
-	DXGI_ADAPTER_DESC AdapterDesc = DXGI_ADAPTER_DESC();
+	DXGI_ADAPTER_DESC AdapterDesc = {};
 	wstring Text = L"";
 
 	// 根据索引枚举本地系统中的适配器。
@@ -241,7 +241,7 @@ void Direct3DApp::LogAdapters()
 
 		OutputDebugString(Text.c_str());
 
-		LogAdapterOutputs(Adapter); // 记录该适配器的输出信息
+		LogAdapterOutputs(Adapter); // 记录该适配器的输出信息。
 
 		RELEASE_COM(Adapter);
 
@@ -253,7 +253,7 @@ void Direct3DApp::LogAdapterOutputs(IDXGIAdapter* Adapter)
 {
 	UINT Index = 0;
 	IDXGIOutput* Output = nullptr;
-	DXGI_OUTPUT_DESC OutputDesc;
+	DXGI_OUTPUT_DESC OutputDesc = {};
 	wstring Text = L"";
 
 	// 根据索引枚举适配器的输出。
@@ -267,7 +267,7 @@ void Direct3DApp::LogAdapterOutputs(IDXGIAdapter* Adapter)
 
 		OutputDebugString(Text.c_str());
 
-		LogOutputDisplayModes(Output, BackBufferFormat); // 记录该输出的显示模式信息
+		LogOutputDisplayModes(Output, BackBufferFormat); // 记录该输出的显示模式信息。
 
 		RELEASE_COM(Output);
 
@@ -282,11 +282,11 @@ void Direct3DApp::LogOutputDisplayModes(IDXGIOutput* Output, DXGI_FORMAT Format)
 	wstring Text = L"";
 	vector<DXGI_MODE_DESC> ModeList;
 
-	Output->GetDisplayModeList(Format, Flags, &ModeCount, nullptr); // 获取显示模式的数量
+	Output->GetDisplayModeList(Format, Flags, &ModeCount, nullptr); // 获取显示模式的数量。
 
 	ModeList.resize(ModeCount);
 
-	Output->GetDisplayModeList(Format, Flags, &ModeCount, &ModeList[0]); // 获取显示模式的列表
+	Output->GetDisplayModeList(Format, Flags, &ModeCount, &ModeList[0]); // 获取显示模式的列表。
 
 	for (DXGI_MODE_DESC& Mode : ModeList)
 	{
@@ -299,15 +299,76 @@ void Direct3DApp::LogOutputDisplayModes(IDXGIOutput* Output, DXGI_FORMAT Format)
 
 void Direct3DApp::CreateCommandObjects()
 {
+	D3D12_COMMAND_QUEUE_DESC CommandQueueDesc = {};
 
+	CommandQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
+	CommandQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
+
+	// 创建命令队列。
+	THROW_IF_FAILED(Device->CreateCommandQueue(&CommandQueueDesc, IID_PPV_ARGS(&CommandQueue)));
+
+	// 创建命令分配器。
+	THROW_IF_FAILED(Device->CreateCommandAllocator(D3D12_COMMAND_LIST_TYPE_DIRECT, IID_PPV_ARGS(&DirectCommandAllocator)));
+
+	// 创建命令列表。
+	THROW_IF_FAILED(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, DirectCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&CommandList)));
+
+	// 第一次引用命令列表时需要重置，而重置之前需要关闭它。
+	CommandList->Close();
 }
 
 void Direct3DApp::CreateSwapChain()
 {
+	DXGI_SWAP_CHAIN_DESC SwapChainDesc = {};
+
+	// 在重新创建交换链之前，释放之前的交换链。
+	SwapChain.Reset();
+
+	SwapChainDesc.BufferDesc.Width = ClientWidth;
+	SwapChainDesc.BufferDesc.Height = ClientHeight;
+	SwapChainDesc.BufferDesc.RefreshRate.Numerator = 60;
+	SwapChainDesc.BufferDesc.RefreshRate.Denominator = 1;
+	SwapChainDesc.BufferDesc.Format = BackBufferFormat;
+	SwapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
+	SwapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
+	SwapChainDesc.SampleDesc.Count = b4xMsaaState ? 4 : 1;
+	SwapChainDesc.SampleDesc.Quality = b4xMsaaState ? Current4xMsaaQualityLevels - 1 : 0;
+	SwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
+	SwapChainDesc.BufferCount = SwapChainBufferCount;
+	SwapChainDesc.OutputWindow = MainWindow;
+	SwapChainDesc.Windowed = TRUE;
+	SwapChainDesc.SwapEffect = DXGI_SWAP_EFFECT_FLIP_DISCARD;
+	SwapChainDesc.Flags = DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH;
+
+	// 创建交换链。
+	THROW_IF_FAILED(DxgiFactory->CreateSwapChain(CommandQueue.Get(), &SwapChainDesc, &SwapChain));
 }
 
 void Direct3DApp::CreateRtvAndDsvDescriptorHeaps()
 {
+	D3D12_DESCRIPTOR_HEAP_DESC RtvHeapDesc = {};
+	D3D12_DESCRIPTOR_HEAP_DESC DsvHeapDesc = {};
+
+	RtvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+	RtvHeapDesc.NumDescriptors = SwapChainBufferCount;
+	RtvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	RtvHeapDesc.NodeMask = 0;
+
+	// 创建 RTV 描述符堆。
+	THROW_IF_FAILED(Device->CreateDescriptorHeap(&RtvHeapDesc, IID_PPV_ARGS(&RtvHeap)));
+
+	DsvHeapDesc.Type = D3D12_DESCRIPTOR_HEAP_TYPE_RTV;
+	DsvHeapDesc.NumDescriptors = 1;
+	DsvHeapDesc.Flags = D3D12_DESCRIPTOR_HEAP_FLAG_NONE;
+	DsvHeapDesc.NodeMask = 0;
+
+	// 创建 DSV 描述符堆。
+	THROW_IF_FAILED(Device->CreateDescriptorHeap(&DsvHeapDesc, IID_PPV_ARGS(&DsvHeap)));
+}
+
+void Direct3DApp::OnResize()
+{
+
 }
 
 void Direct3DApp::FlushCommandQueue()
