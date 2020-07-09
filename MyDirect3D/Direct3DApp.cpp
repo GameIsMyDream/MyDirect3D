@@ -16,14 +16,16 @@ Direct3DApp::Direct3DApp(HINSTANCE Instance) :
 	MainWindowName(L"My Direct3D Window"),
 	ClientWidth(960),
 	ClientHeight(540),
-	CurrentBackBuffer(0),
+	bAppPaused(false),
+	CurrentBackBufferIndex(0),
 	b4xMsaaState(false),
 	Current4xMsaaQualityLevels(0),
-	BackBufferFormat(DXGI_FORMAT_R8G8B8A8_UNORM),
-	DepthStencilBufferFormat(DXGI_FORMAT_D24_UNORM_S8_UINT),
 	RtvDescriptorSize(0),
 	DsvDescriptorSize(0),
-	CbvSrvUavDescriptorSize(0)
+	CbvSrvUavDescriptorSize(0),
+	BackBufferFormat(DXGI_FORMAT_R8G8B8A8_UNORM),
+	DepthStencilBufferFormat(DXGI_FORMAT_D24_UNORM_S8_UINT),
+	CurrentFence(0)
 {
 	assert(Singleton == nullptr);
 
@@ -84,22 +86,38 @@ void Direct3DApp::Set4xMsaaState(bool bState)
 
 int Direct3DApp::Run()
 {
-	MSG Msg = { 0 };
+	MSG Message = {};
 
-	while (Msg.message != WM_QUIT)
+	// 重置计时器。
+	Timer.Reset();
+
+	// 执行消息循环。
+	while (Message.message != WM_QUIT)
 	{
-		if (PeekMessage(&Msg, 0, 0, 0, PM_REMOVE))
+		// 若有窗口消息，则处理。
+		if (PeekMessage(&Message, NULL, 0, 0, PM_REMOVE))
 		{
-			TranslateMessage(&Msg);
-			DispatchMessage(&Msg);
+			TranslateMessage(&Message);
+			DispatchMessage(&Message);
 		}
-		else
+		else // 否则，执行 Tick 函数。
 		{
-			;
+			Timer.Tick();
+
+			if (!bAppPaused)
+			{
+				CalculateFrameStats();
+				Update(Timer);
+				Draw(Timer);
+			}
+			else
+			{
+				Sleep(100);
+			}
 		}
 	}
 
-	return static_cast<int>(Msg.wParam);
+	return static_cast<int>(Message.wParam);
 }
 
 bool Direct3DApp::InitMainWindow()
@@ -128,9 +146,9 @@ bool Direct3DApp::InitMainWindow()
 		return false;
 	}
 
-	RECT WindowRect = { 0, 0, ClientWidth, ClientHeight };
-	LONG WindowWidth = WindowRect.right - WindowRect.left;
-	LONG WindowHeight = WindowRect.bottom - WindowRect.top;
+	RECT WindowRect = { 0, 0, static_cast<LONG>(ClientWidth), static_cast<LONG>(ClientHeight) };
+	UINT WindowWidth = WindowRect.right - WindowRect.left;
+	UINT WindowHeight = WindowRect.bottom - WindowRect.top;
 
 	// 根据工作区矩形的期望大小，计算窗口矩形所需的大小
 	AdjustWindowRectEx(&WindowRect, WS_OVERLAPPEDWINDOW, FALSE, NULL);
@@ -141,8 +159,8 @@ bool Direct3DApp::InitMainWindow()
 		MainWindowClassName.c_str(),
 		MainWindowName.c_str(),
 		WS_OVERLAPPEDWINDOW,
-		static_cast<int>((GetSystemMetrics(SM_CXSCREEN) - WindowWidth) / 2),
-		static_cast<int>((GetSystemMetrics(SM_CYSCREEN) - WindowHeight) / 2),
+		(GetSystemMetrics(SM_CXSCREEN) - WindowWidth) / 2,
+		(GetSystemMetrics(SM_CYSCREEN) - WindowHeight) / 2,
 		WindowWidth,
 		WindowHeight,
 		NULL,
@@ -366,19 +384,86 @@ void Direct3DApp::CreateRtvAndDsvDescriptorHeaps()
 	THROW_IF_FAILED(Device->CreateDescriptorHeap(&DsvHeapDesc, IID_PPV_ARGS(&DsvHeap)));
 }
 
+void Direct3DApp::CalculateFrameStats()
+{
+	static UINT FrameCount = 0;
+	static float TimeElapsed = 0.0f;
+	float FramesPerSecond = 0.0f;
+	float MillisecondsPerFrame = 0.0f;
+
+	++FrameCount;
+
+	if (Timer.GetTotalTime() - TimeElapsed >= 1.0f)
+	{
+		FramesPerSecond = static_cast<float>(FrameCount); // 计算 FPS：帧数 / 秒。
+		MillisecondsPerFrame = 1000.0f / FramesPerSecond; // 计算 MSPF：1000 / FPS。
+
+		SetWindowText(MainWindow, (L"    FPS: " + to_wstring(FramesPerSecond) + L"    MSPF: " + to_wstring(MillisecondsPerFrame)).c_str());
+
+		FrameCount = 0;
+		TimeElapsed += 1.0f;
+	}
+}
+
 void Direct3DApp::OnResize()
 {
+	assert(Device);
+	assert(SwapChain);
+	assert(DirectCommandAllocator);
 
+	// 在改变资源前刷新命令队列。
+	FlushCommandQueue();
+
+	// 将命令列表重置为初始状态。
+	THROW_IF_FAILED(CommandList->Reset(DirectCommandAllocator.Get(), nullptr));
+
+	// 释放需要重新创建的资源。
+	for (UINT i = 0; i != SwapChainBufferCount; ++i)
+	{
+		SwapChainBuffers[i].Reset();
+	}
+	DepthStencilBuffer.Reset();
+
+	// 调整交换链的大小
+	THROW_IF_FAILED(SwapChain->ResizeBuffers(SwapChainBufferCount, ClientWidth, ClientHeight, BackBufferFormat, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH));
+
+	CurrentBackBufferIndex = 0;
+
+	//D3D12_CPU_DESCRIPTOR_HANDLE RtvHeapHandle = {};
+	//
+	//for (UINT i = 0; i != SwapChainBufferCount; ++i)
+	//{
+	//	THROW_IF_FAILED(SwapChain->GetBuffer(i, IID_PPV_ARGS(&SwapChainBuffers[i])));
+	//
+	//	Device->CreateRenderTargetView(SwapChainBuffers[i].Get(), nullptr, RtvHeapHandle);
+	//
+	//	RtvHeapHandle
+	//}
 }
 
 void Direct3DApp::FlushCommandQueue()
 {
+	++CurrentFence;
 
+	// 更新围栏值。
+	THROW_IF_FAILED(CommandQueue->Signal(Fence.Get(), CurrentFence));
+
+	// 如果需要，则等待 GPU 完成命令到达当前的围栏值。
+	if (Fence->GetCompletedValue() < CurrentFence)
+	{
+		HANDLE CommandCompletionEvent = CreateEventEx(nullptr, nullptr, NULL, EVENT_ALL_ACCESS);
+
+		THROW_IF_FAILED(Fence->SetEventOnCompletion(CurrentFence, CommandCompletionEvent));
+
+		WaitForSingleObject(CommandCompletionEvent, INFINITE);
+
+		CloseHandle(CommandCompletionEvent);
+	}
 }
 
 ID3D12Resource* Direct3DApp::GetCurrentBackBuffer() const
 {
-	return SwapChainBuffers[CurrentBackBuffer].Get();
+	return SwapChainBuffers[CurrentBackBufferIndex].Get();
 }
 
 LRESULT Direct3DApp::MainWindowProcedure(HWND Wnd, UINT Msg, WPARAM WParam, LPARAM LParam)

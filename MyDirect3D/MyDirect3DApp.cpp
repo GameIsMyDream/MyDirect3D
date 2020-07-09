@@ -21,3 +21,13 @@ bool MyDirect3DApp::Initialize()
 
 	return true;
 }
+
+void MyDirect3DApp::Update(const GameTimer& Timer)
+{
+
+}
+
+void MyDirect3DApp::Draw(const GameTimer& Timer)
+{
+
+}

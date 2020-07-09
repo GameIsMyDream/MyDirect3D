@@ -10,4 +10,6 @@ public:
 
 public:
 	virtual bool Initialize() override;
+	virtual void Update(const GameTimer& Timer) override;
+	virtual void Draw(const GameTimer& Timer) override;
 };
