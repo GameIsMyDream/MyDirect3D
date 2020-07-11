@@ -21,16 +21,16 @@ protected:
 	// 构造函数。
 	explicit Direct3DApp(HINSTANCE Instance);
 
-	// 已删除：拷贝构造函数。
+	// 拷贝构造函数（已删除）。
 	Direct3DApp(const Direct3DApp& Rhs) = delete;
 
-	// 已删除：移动构造函数。
+	// 移动构造函数（已删除）。
 	Direct3DApp(Direct3DApp&& Rhs) = delete;
 
-	// 已删除：拷贝赋值运算符。
+	// 拷贝赋值运算符（已删除）。
 	Direct3DApp& operator=(const Direct3DApp& Rhs) = delete;
 
-	// 已删除：移动赋值运算符。
+	// 移动赋值运算符（已删除）。
 	Direct3DApp& operator=(Direct3DApp&& Rhs) = delete;
 
 	// 析构函数。
@@ -42,6 +42,9 @@ public:
 
 	// 主窗口消息循环。
 	int Run();
+
+	// 主窗口程序。
+	LRESULT CALLBACK MainWindowProcedure(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam);
 
 	// 获取单例指针。
 	static Direct3DApp* Get();
@@ -101,22 +104,37 @@ protected:
 	// 刷新命令队列。
 	virtual void FlushCommandQueue();
 
+	// 当按下鼠标时调用。
+	virtual void OnMouseButtonDown(WPARAM ButtonState, int ButtonX, int ButtonY) {};
+
+	// 当释放鼠标时调用。
+	virtual void OnMouseButtonUp(WPARAM ButtonState, int ButtonX, int ButtonY) {};
+
+	// 当光标移动时调用。
+	virtual void OnMouseButtonMove(WPARAM ButtonState, int ButtonX, int ButtonY) {};
+
 	// 获取当前后台缓冲区。
 	ID3D12Resource* GetCurrentBackBuffer() const;
 
-	// 主窗口程序。
-	static LRESULT CALLBACK MainWindowProcedure(HWND Wnd, UINT Msg, WPARAM WParam, LPARAM LParam);
+	// 获取当前后台缓冲区描述符。
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentBackBufferView() const;
+
+	// 获取当前深度/模板缓冲区描述符。
+	D3D12_CPU_DESCRIPTOR_HANDLE GetCurrentDepthStencilBufferView() const;
 
 protected:
-	static Direct3DApp*		Singleton;				// 单例指针
-	HINSTANCE				AppInstance;			// 应用程序实例句柄
-	HWND					MainWindow;				// 主窗口句柄
-	std::wstring			MainWindowClassName;	// 主窗口类名
-	std::wstring			MainWindowName;			// 主窗口名
-	UINT					ClientWidth;			// 主窗口工作区宽度
-	UINT					ClientHeight;			// 主窗口工作区高度
-	bool					bAppPaused;				// 表示应用程序是否暂停
-	GameTimer				Timer;					// 计时器
+	static Direct3DApp*	Singleton;				// 单例指针
+	HINSTANCE			AppInstance;			// 应用程序实例句柄
+	HWND				MainWindow;				// 主窗口句柄
+	std::wstring		MainWindowClassName;	// 主窗口类名
+	std::wstring		MainWindowName;			// 主窗口名
+	UINT				ClientWidth;			// 主窗口工作区宽度
+	UINT				ClientHeight;			// 主窗口工作区高度
+	bool				bAppPaused;				// 表示应用程序是否暂停
+	bool				bMinimized;				// 表示窗口是否已被最小化
+	bool				bMaximized;				// 表示窗口是否已被最大化
+	bool				bResizing;				// 表示窗口大小是否正在被调整
+	GameTimer			Timer;					// 计时器
 
 	UINT				CurrentBackBufferIndex;		// 当前后台缓冲区索引
 	bool				b4xMsaaState;				// 4倍多重采样抗锯齿状态
@@ -128,8 +146,10 @@ protected:
 	DXGI_FORMAT			DepthStencilBufferFormat;	// 深度模板缓冲区格式
 	UINT64				CurrentFence;				// 当前的围栏值
 	static const UINT	SwapChainBufferCount = 2;	// 交换链缓冲区数量
+	D3D12_VIEWPORT		ScreenViewport;				// 屏幕视口
+	D3D12_RECT			ScreenRect;					// 屏幕矩形
 
-	Microsoft::WRL::ComPtr<IDXGIFactory7>				DxgiFactory;							// DXGI 工厂
+	Microsoft::WRL::ComPtr<IDXGIFactory4>				DxgiFactory;							// DXGI 工厂
 	Microsoft::WRL::ComPtr<ID3D12Device>				Device;									// 设备
 	Microsoft::WRL::ComPtr<ID3D12Fence>					Fence;									// 围栏
 	Microsoft::WRL::ComPtr<ID3D12CommandQueue>			CommandQueue;							// 命令队列
@@ -141,3 +161,5 @@ protected:
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>		RtvHeap;								// RTV 描述符堆
 	Microsoft::WRL::ComPtr<ID3D12DescriptorHeap>		DsvHeap;								// DSV 描述符堆
 };
+
+LRESULT CALLBACK Direct3DAppWindowProcedure(HWND Window, UINT Message, WPARAM WParam, LPARAM LParam);

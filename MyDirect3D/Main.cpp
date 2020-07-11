@@ -20,7 +20,7 @@ int WINAPI WinMain(HINSTANCE Instance, HINSTANCE PrevInstance, PSTR CmdLine, int
 	}
 	catch (DxException& e)
 	{
-		MessageBox(nullptr, e.ToString().c_str(), L"HR Failed", MB_OK);
+		MessageBox(nullptr, e.ToString().c_str(), L"Hardware Result Failed", MB_OK);
 		return 0;
 	}
 

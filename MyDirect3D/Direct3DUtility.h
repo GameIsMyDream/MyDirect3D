@@ -1,5 +1,8 @@
 #pragma once
 
+/**
+ * Direct3D 公用程序类。
+ */
 class Direct3DUtility
 {
 public:
@@ -14,6 +17,9 @@ public:
 	}
 };
 
+/**
+ * Direct3D 异常类。
+ */
 class DxException
 {
 public:

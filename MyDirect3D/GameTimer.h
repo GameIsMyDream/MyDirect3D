@@ -1,5 +1,8 @@
 #pragma once
 
+/**
+ * Direct3D ¼ÆÊ±Æ÷Àà¡£
+ */
 class GameTimer
 {
 public:

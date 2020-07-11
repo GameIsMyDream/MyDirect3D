@@ -12,7 +12,6 @@ GameTimer::GameTimer() :
 	DeltaSeconds(-1.0)
 {
 	LARGE_INTEGER CountsPerSecond;
-
 	QueryPerformanceFrequency(&CountsPerSecond);
 	SecondsPerCount = 1.0 / static_cast<double>(CountsPerSecond.QuadPart);
 }
@@ -20,7 +19,6 @@ GameTimer::GameTimer() :
 void GameTimer::Reset()
 {
 	LARGE_INTEGER CurrentCount;
-
 	QueryPerformanceCounter(&CurrentCount);
 
 	bStoped = false;
@@ -38,7 +36,6 @@ void GameTimer::Tick()
 	}
 
 	LARGE_INTEGER CurrentCount;
-
 	QueryPerformanceCounter(&CurrentCount);
 
 	CurrentFrameCount = CurrentCount.QuadPart;
@@ -58,7 +55,6 @@ void GameTimer::Stop()
 	if (!bStoped)
 	{
 		LARGE_INTEGER CurrentCount;
-
 		QueryPerformanceCounter(&CurrentCount);
 
 		StopCount = CurrentCount.QuadPart;
@@ -71,7 +67,6 @@ void GameTimer::Start()
 	if (bStoped)
 	{
 		LARGE_INTEGER CurrentCount;
-
 		QueryPerformanceCounter(&CurrentCount);
 
 		PausedCounts += CurrentCount.QuadPart - StopCount;
