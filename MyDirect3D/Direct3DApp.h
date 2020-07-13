@@ -136,18 +136,18 @@ protected:
 	bool				bResizing;				// 表示窗口大小是否正在被调整
 	GameTimer			Timer;					// 计时器
 
-	UINT				CurrentBackBufferIndex;		// 当前后台缓冲区索引
-	bool				b4xMsaaState;				// 4倍多重采样抗锯齿状态
-	UINT				Current4xMsaaQualityLevels;	// 4倍多重采样抗锯齿质量级别
-	UINT				RtvDescriptorSize;			// RTV（渲染目标视图）描述符大小
-	UINT				DsvDescriptorSize;			// DSV（深度/模板视图）描述符大小
-	UINT				CbvSrvUavDescriptorSize;	// CBV（常量缓冲区视图）、SRV（着色器资源视图）和 UAV（无序访问视图）描述符大小
-	DXGI_FORMAT			BackBufferFormat;			// 后台缓冲区格式
-	DXGI_FORMAT			DepthStencilBufferFormat;	// 深度模板缓冲区格式
-	UINT64				CurrentFence;				// 当前的围栏值
-	static const UINT	SwapChainBufferCount = 2;	// 交换链缓冲区数量
-	D3D12_VIEWPORT		ScreenViewport;				// 屏幕视口
-	D3D12_RECT			ScreenRect;					// 屏幕矩形
+	UINT				CurrentBackBufferIndex;			// 当前后台缓冲区索引
+	bool				b4xMsaaState;					// 4倍多重采样抗锯齿状态
+	UINT				NumberOf4xMsaaQualityLevels;	// 4倍多重采样抗锯齿质量级别
+	UINT				RtvDescriptorSize;				// RTV（渲染目标视图）描述符大小
+	UINT				DsvDescriptorSize;				// DSV（深度/模板视图）描述符大小
+	UINT				CbvSrvUavDescriptorSize;		// CBV（常量缓冲区视图）、SRV（着色器资源视图）和 UAV（无序访问视图）描述符大小
+	DXGI_FORMAT			BackBufferFormat;				// 后台缓冲区格式
+	DXGI_FORMAT			DepthStencilBufferFormat;		// 深度模板缓冲区格式
+	UINT64				CurrentFence;					// 当前的围栏值
+	static const UINT	SwapChainBufferCount = 2;		// 交换链缓冲区数量
+	D3D12_VIEWPORT		ScreenViewport;					// 屏幕视口
+	D3D12_RECT			ScreenRect;						// 屏幕矩形
 
 	Microsoft::WRL::ComPtr<IDXGIFactory4>				DxgiFactory;							// DXGI 工厂
 	Microsoft::WRL::ComPtr<ID3D12Device>				Device;									// 设备

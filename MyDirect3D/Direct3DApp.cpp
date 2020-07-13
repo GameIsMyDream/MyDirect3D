@@ -22,7 +22,7 @@ Direct3DApp::Direct3DApp(HINSTANCE Instance) :
 	bResizing(false),
 	CurrentBackBufferIndex(0),
 	b4xMsaaState(false),
-	Current4xMsaaQualityLevels(0),
+	NumberOf4xMsaaQualityLevels(0),
 	RtvDescriptorSize(0),
 	DsvDescriptorSize(0),
 	CbvSrvUavDescriptorSize(0),
@@ -44,11 +44,13 @@ Direct3DApp::~Direct3DApp()
 
 bool Direct3DApp::Initialize()
 {
+	// 创建并初始化主窗口。
 	if (!InitMainWindow())
 	{
 		return false;
 	}
 
+	// 初始化 Direct3D。
 	if (!InitDirect3D())
 	{
 		return false;
@@ -286,7 +288,7 @@ bool Direct3DApp::InitMainWindow()
 	MainWindowClass.lpszClassName = MainWindowClassName.c_str();						// 类名
 	MainWindowClass.hIconSm = NULL;														// 小图标的句柄
 
-	// 注册窗口类
+	// 注册窗口类。
 	if (!RegisterClassEx(&MainWindowClass))
 	{
 		wstring Text = L"RegisterClass failed, error code: " + to_wstring(GetLastError()) + L".";
@@ -295,26 +297,16 @@ bool Direct3DApp::InitMainWindow()
 		return false;
 	}
 
-	// 根据工作区矩形的期望大小，计算窗口矩形所需的大小
+	// 创建窗口。
 	RECT WindowRect = { 0, 0, static_cast<LONG>(ClientWidth), static_cast<LONG>(ClientHeight) };
-	AdjustWindowRectEx(&WindowRect, WS_OVERLAPPEDWINDOW, FALSE, NULL);
+	AdjustWindowRectEx(&WindowRect, WS_OVERLAPPEDWINDOW, FALSE, NULL); // 根据工作区矩形的期望大小，计算窗口矩形所需的大小。
 
-	// 创建窗口
 	UINT WindowWidth = WindowRect.right - WindowRect.left;
 	UINT WindowHeight = WindowRect.bottom - WindowRect.top;
-	MainWindow = CreateWindowEx(
-		NULL,
-		MainWindowClassName.c_str(),
-		MainWindowName.c_str(),
-		WS_OVERLAPPEDWINDOW,
-		(GetSystemMetrics(SM_CXSCREEN) - WindowWidth) / 2,
-		(GetSystemMetrics(SM_CYSCREEN) - WindowHeight) / 2,
-		WindowWidth,
-		WindowHeight,
-		NULL,
-		NULL,
-		AppInstance,
-		NULL);
+
+	MainWindow = CreateWindowEx(NULL, MainWindowClassName.c_str(), MainWindowName.c_str(), WS_OVERLAPPEDWINDOW,
+		(GetSystemMetrics(SM_CXSCREEN) - WindowWidth) / 2, (GetSystemMetrics(SM_CYSCREEN) - WindowHeight) / 2,
+		WindowWidth, WindowHeight, NULL, NULL, AppInstance, NULL);
 
 	if (!MainWindow)
 	{
@@ -324,10 +316,10 @@ bool Direct3DApp::InitMainWindow()
 		return false;
 	}
 
-	// 显示并向窗口程序发送一个 WM_PAINT 消息
+	// 显示并向窗口程序发送一个 WM_PAINT 消息。
 	ShowWindow(MainWindow, SW_SHOW);
 
-	// 更新主窗口的工作区
+	// 更新主窗口的工作区。
 	UpdateWindow(MainWindow);
 
 	return true;
@@ -344,13 +336,12 @@ bool Direct3DApp::InitDirect3D()
 	// 创建 DXGI 工厂。
 	THROW_IF_FAILED(CreateDXGIFactory1(IID_PPV_ARGS(&DxgiFactory)));
 
-	// 创建设备，用来表示显示适配器。第一个参数传递 nullptr 使用默认适配器（IDXGIFactory1::EnumAdapters 函数枚举的第一个适配器）。
-	HRESULT HardwareResult = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&Device));
-	// 若创建设备失败，则枚举 WARP（Windows Advanced Rasterization Platform，Windows 高级光栅化平台）作为适配器来创建设备。
-	if (FAILED(HardwareResult))
+	// 创建设备。
+	HRESULT HardwareResult = D3D12CreateDevice(nullptr, D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&Device)); // 第一个参数传递 nullptr 将使用主显示适配器。
+	if (FAILED(HardwareResult)) // 若创建设备失败：
 	{
+		// 则回退到 WARP（Windows 高级光栅化平台）设备。
 		ComPtr<IDXGIAdapter4> WarpAdapter;
-
 		THROW_IF_FAILED(DxgiFactory->EnumWarpAdapter(IID_PPV_ARGS(&WarpAdapter)));
 		THROW_IF_FAILED(D3D12CreateDevice(WarpAdapter.Get(), D3D_FEATURE_LEVEL_12_1, IID_PPV_ARGS(&Device)));
 	}
@@ -358,30 +349,33 @@ bool Direct3DApp::InitDirect3D()
 	// 创建围栏。
 	THROW_IF_FAILED(Device->CreateFence(0, D3D12_FENCE_FLAG_NONE, IID_PPV_ARGS(&Fence)));
 
-	// 获取描述符堆的句柄增量大小。
+	// 获取描述符的大小。
 	RtvDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_RTV);
 	DsvDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_DSV);
 	CbvSrvUavDescriptorSize = Device->GetDescriptorHandleIncrementSize(D3D12_DESCRIPTOR_HEAP_TYPE_CBV_SRV_UAV);
 
-	// 检查当前图形驱动程序支持的多重采样的质量级别信息。
+	// 检查当前图形驱动程序是否支持4倍多重采样抗锯齿。
 	D3D12_FEATURE_DATA_MULTISAMPLE_QUALITY_LEVELS QualityLevels = {};
 	QualityLevels.Format = BackBufferFormat;
 	QualityLevels.SampleCount = 4;
 	QualityLevels.Flags = D3D12_MULTISAMPLE_QUALITY_LEVELS_FLAG_NONE;
 	QualityLevels.NumQualityLevels = 0;
-
 	THROW_IF_FAILED(Device->CheckFeatureSupport(D3D12_FEATURE_MULTISAMPLE_QUALITY_LEVELS, &QualityLevels, sizeof(QualityLevels)));
-	Current4xMsaaQualityLevels = QualityLevels.NumQualityLevels;
-	assert(Current4xMsaaQualityLevels > 0 && "Unexpected MSAA quality levels.");
+	NumberOf4xMsaaQualityLevels = QualityLevels.NumQualityLevels;
+	assert(NumberOf4xMsaaQualityLevels > 0 && "Unexpected MSAA quality levels.");
 
 #ifdef _DEBUG
+	// 将当前适配器信息打印到输出窗口。
 	LogAdapters();
-#endif // 将当前适配器信息打印到输出窗口。
+#endif
 
+	// 创建命令对象。
 	CreateCommandObjects();
 
+	// 创建交换链。
 	CreateSwapChain();
 
+	// 创建描述符堆。
 	CreateRtvAndDsvDescriptorHeaps();
 
 	return true;
@@ -461,11 +455,10 @@ void Direct3DApp::LogOutputDisplayModes(IDXGIOutput* Output, DXGI_FORMAT Format)
 
 void Direct3DApp::CreateCommandObjects()
 {
+	// 创建命令队列。
 	D3D12_COMMAND_QUEUE_DESC CommandQueueDesc = {};
 	CommandQueueDesc.Type = D3D12_COMMAND_LIST_TYPE_DIRECT;
 	CommandQueueDesc.Flags = D3D12_COMMAND_QUEUE_FLAG_NONE;
-
-	// 创建命令队列。
 	THROW_IF_FAILED(Device->CreateCommandQueue(&CommandQueueDesc, IID_PPV_ARGS(&CommandQueue)));
 
 	// 创建命令分配器。
@@ -473,14 +466,12 @@ void Direct3DApp::CreateCommandObjects()
 
 	// 创建命令列表。
 	THROW_IF_FAILED(Device->CreateCommandList(0, D3D12_COMMAND_LIST_TYPE_DIRECT, DirectCommandAllocator.Get(), nullptr, IID_PPV_ARGS(&CommandList)));
-
-	// 第一次引用命令列表时需要重置，而重置之前需要关闭它。
-	CommandList->Close();
+	CommandList->Close(); // 第一次引用命令列表时需要重置，而重置之前需要关闭它。
 }
 
 void Direct3DApp::CreateSwapChain()
 {
-	// 在重新创建交换链之前，释放之前的交换链。
+	// 在创建交换链之前，释放之前的交换链。
 	SwapChain.Reset();
 
 	// 创建交换链。
@@ -493,7 +484,7 @@ void Direct3DApp::CreateSwapChain()
 	SwapChainDesc.BufferDesc.ScanlineOrdering = DXGI_MODE_SCANLINE_ORDER_UNSPECIFIED;
 	SwapChainDesc.BufferDesc.Scaling = DXGI_MODE_SCALING_UNSPECIFIED;
 	SwapChainDesc.SampleDesc.Count = b4xMsaaState ? 4 : 1;
-	SwapChainDesc.SampleDesc.Quality = b4xMsaaState ? Current4xMsaaQualityLevels - 1 : 0;
+	SwapChainDesc.SampleDesc.Quality = b4xMsaaState ? NumberOf4xMsaaQualityLevels - 1 : 0;
 	SwapChainDesc.BufferUsage = DXGI_USAGE_RENDER_TARGET_OUTPUT;
 	SwapChainDesc.BufferCount = SwapChainBufferCount;
 	SwapChainDesc.OutputWindow = MainWindow;
@@ -546,31 +537,28 @@ void Direct3DApp::OnResize()
 	assert(Device);
 	assert(SwapChain);
 	assert(DirectCommandAllocator);
-
-	// 在改变资源前刷新命令队列。
+	
 	FlushCommandQueue();
 
-	// 将命令列表重置为初始状态。
+	// 重置命令列表。
 	THROW_IF_FAILED(CommandList->Reset(DirectCommandAllocator.Get(), nullptr));
 
-	// 释放需要重新创建的资源。
+	// 释放缓冲区。
 	for (UINT i = 0; i != SwapChainBufferCount; ++i)
 	{
 		SwapChainBuffers[i].Reset();
 	}
 	DepthStencilBuffer.Reset();
 
-	// 调整交换链的大小
-	THROW_IF_FAILED(SwapChain->ResizeBuffers(SwapChainBufferCount, ClientWidth, ClientHeight, BackBufferFormat, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH));
-
+	// 创建渲染目标描述符。
+	THROW_IF_FAILED(SwapChain->ResizeBuffers(SwapChainBufferCount, ClientWidth, ClientHeight, BackBufferFormat, DXGI_SWAP_CHAIN_FLAG_ALLOW_MODE_SWITCH)); // 调整交换链的大小。
 	CurrentBackBufferIndex = 0;
 
-	// 获取表示堆起始位置的CPU描述符句柄，以此来创建一个辅助结构体。
-	CD3DX12_CPU_DESCRIPTOR_HANDLE RtvHeapHandle(RtvHeap->GetCPUDescriptorHandleForHeapStart());
-	
+	CD3DX12_CPU_DESCRIPTOR_HANDLE RtvHeapHandle(RtvHeap->GetCPUDescriptorHandleForHeapStart()); // 创建一个描述符句柄的辅助结构体。
+
 	for (UINT i = 0; i != SwapChainBufferCount; ++i)
 	{
-		THROW_IF_FAILED(SwapChain->GetBuffer(i, IID_PPV_ARGS(&SwapChainBuffers[i])));
+		THROW_IF_FAILED(SwapChain->GetBuffer(i, IID_PPV_ARGS(&SwapChainBuffers[i]))); // 获取交换链中的缓冲区。
 	
 		Device->CreateRenderTargetView(SwapChainBuffers[i].Get(), nullptr, RtvHeapHandle);
 	
@@ -587,7 +575,7 @@ void Direct3DApp::OnResize()
 	DepthStencilDesc.MipLevels = 1;
 	DepthStencilDesc.Format = DXGI_FORMAT_R24G8_TYPELESS;
 	DepthStencilDesc.SampleDesc.Count = b4xMsaaState ? 4 : 1;
-	DepthStencilDesc.SampleDesc.Quality = b4xMsaaState ? (Current4xMsaaQualityLevels - 1) : 0;
+	DepthStencilDesc.SampleDesc.Quality = b4xMsaaState ? (NumberOf4xMsaaQualityLevels - 1) : 0;
 	DepthStencilDesc.Layout = D3D12_TEXTURE_LAYOUT_UNKNOWN;
 	DepthStencilDesc.Flags = D3D12_RESOURCE_FLAG_ALLOW_DEPTH_STENCIL;
 
@@ -614,10 +602,9 @@ void Direct3DApp::OnResize()
 	ID3D12CommandList* CommandLists[] = { CommandList.Get() };
 	CommandQueue->ExecuteCommandLists(_countof(CommandLists), CommandLists);
 
-	// 等待窗口大小调整完成
 	FlushCommandQueue();
 
-	// 更新视口的外观
+	// 设置视口和裁剪矩形。
 	ScreenViewport.TopLeftX = 0;
 	ScreenViewport.TopLeftY = 0;
 	ScreenViewport.Width = static_cast<float>(ClientWidth);
